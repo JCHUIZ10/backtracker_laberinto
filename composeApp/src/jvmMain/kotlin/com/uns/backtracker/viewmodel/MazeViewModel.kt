@@ -1,155 +1,179 @@
 package com.uns.backtracker.viewmodel
 
-import com.uns.backtracker.generador.GeneradorBacktrackingRecursivo
-import com.uns.backtracker.model.*
+import com.uns.backtracker.dominio.eventos.EventoLaberinto
+import com.uns.backtracker.dominio.model.*
+import com.uns.backtracker.observador.IObservadorLaberinto
+import com.uns.backtracker.usercase.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlin.random.Random
 
-data class MazeState(
-    val config: ConfiguracionLaberinto = ConfiguracionLaberinto(
-        15, 15, 100,
-        EsquinaInicial.SUPERIOR_IZQ,
-        3
-    ),
-    val animLaberinto: Laberinto? = null,
-    val visitadas: Set<Coordenada> = emptySet(),
-    val huellas: List<Coordenada> = emptyList(),
-    val mineroPos: Coordenada? = null,
-    val totalEventos: Int = 0,
-    val eventoActual: Int = 0,
-    val isPlaying: Boolean = false,
-    val velocidadMs: Long = 30L,
-    val evaluacion: ResultadoEvaluacion? = null,
-    val eventosHistory: List<EventoGeneracion> = emptyList()
-)
-
-class MazeViewModel {
+class MazeViewModel : IObservadorLaberinto {
     private val _state = MutableStateFlow(MazeState())
     val state: StateFlow<MazeState> = _state.asStateFlow()
-    private var currentData: DataLaberinto? = null
-    private var jobAnimacion: Job? = null
-    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
-    fun updateConfig(ancho: Int, alto: Int, semilla: Long, cuarto: Int) {
-        _state.update { it.copy(config = it.config.copy(ancho = ancho, alto = alto, semilla = semilla, tamanoCuartoCentro = cuarto)) }
+    private val viewModelScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private var playbackJob: Job? = null
+
+    private val facade = GeneradorLaberintoFacade(
+        generadorDFS = UserCaseGeneradorDFS(Random(0)),
+        inyectorCiclos = UserCaseInyectorCiclos(),
+        solucionadorBFS = UserCaseSolucionadorBFS(),
+        calculadorMetricas = UserCaseCalculadorMetricas()
+    ).also { it.agregarObservador(this) }
+
+    init {
+        _state.update { it.copy(animLaberinto = Laberinto.vacio(it.config)) }
     }
+
+    fun setModoInteraccion(modo: ModoInteraccion) {
+        _state.update { it.copy(modoActual = modo) }
+    }
+
+    fun onCeldaClickeada(coordenada: Coordenada) {
+        val estadoActual = _state.value
+        val config = estadoActual.config
+        if (estadoActual.modoActual == ModoInteraccion.SELECCIONANDO_INICIO) {
+            if (coordenada != config.fin) {
+                _state.update { it.copy(config = config.copy(inicio = coordenada), modoActual = ModoInteraccion.NINGUNO) }
+            }
+        } else if (estadoActual.modoActual == ModoInteraccion.SELECCIONANDO_FIN) {
+            if (coordenada != config.inicio) {
+                _state.update { it.copy(config = config.copy(fin = coordenada), modoActual = ModoInteraccion.NINGUNO) }
+            }
+        }
+    }
+
+    fun updateConfigManual(ancho: Int, alto: Int, semilla: Long, dificultad: Dificultad, inicio: Coordenada, fin: Coordenada) {
+        _state.update { 
+            val nuevaConfig = it.config.copy(
+                filas = alto,
+                columnas = ancho,
+                semillaValue = semilla,
+                inicio = inicio,
+                fin = fin,
+                dificultad = dificultad
+            )
+            it.copy(
+                config = nuevaConfig,
+                animLaberinto = if (it.laberintoFinal == null) Laberinto.vacio(nuevaConfig) else it.animLaberinto
+            )
+        }
+    }
+
+    fun generar() {
+        stopPlayback()
+        _state.update { 
+            it.copy(
+                eventos = emptyList(),
+                eventoActualIndex = -1,
+                visitadas = emptySet(),
+                mineroPos = null,
+                caminoOptimoVisual = emptyList(),
+                laberintoFinal = null
+            )
+        }
+
+        viewModelScope.launch(Dispatchers.Default) {
+            val laberinto = facade.generar(_state.value.config)
+            _state.update { it.copy(laberintoFinal = laberinto) }
+            startPlayback()
+        }
+    }
+
+    override fun onEvento(evento: EventoLaberinto) {
+        _state.update { it.copy(eventos = it.eventos + evento) }
+    }
+
+    fun togglePlayPause() {
+        if (_state.value.isPlaying) stopPlayback() else startPlayback()
+    }
+
+    fun avanzarPaso() = procesarSiguienteEvento()
 
     fun updateSpeed(speed: Long) {
         _state.update { it.copy(velocidadMs = speed) }
     }
 
-    fun generar() {
-        pausar()
-        val cfg = _state.value.config
-        val generador = GeneradorBacktrackingRecursivo()
-        val resultado = generador.generar(cfg)
-        currentData = resultado
-        
-        _state.update { it.copy(evaluacion = null, eventosHistory = resultado.eventos) }
-        reiniciarAnimacion()
-    }
-
-    fun reiniciarAnimacion() {
-        pausar()
-        val data = currentData ?: return
-        val nuevoLab = Laberinto(data.laberinto.alto, data.laberinto.ancho)
-        
-        _state.update { 
-            it.copy(
-                animLaberinto = nuevoLab,
-                visitadas = emptySet(),
-                huellas = emptyList(),
-                mineroPos = null,
-                eventoActual = 0,
-                totalEventos = data.eventos.size
-            )
-        }
-    }
-
-    fun togglePlayPause() {
-        if (_state.value.isPlaying) {
-            pausar()
-        } else {
-            reproducir()
-        }
-    }
-
-    private fun pausar() {
-        _state.update { it.copy(isPlaying = false) }
-        jobAnimacion?.cancel()
-    }
-
-    private fun reproducir() {
-        if (currentData == null || _state.value.eventoActual >= (currentData?.eventos?.size ?: 0)) return
+    private fun startPlayback() {
+        if (playbackJob?.isActive == true) return
         _state.update { it.copy(isPlaying = true) }
-        
-        jobAnimacion = scope.launch {
-            while (_state.value.isPlaying && _state.value.eventoActual < (currentData?.eventos?.size ?: 0)) {
-                avanzarPaso()
+        playbackJob = viewModelScope.launch {
+            while (isActive && _state.value.eventoActualIndex < _state.value.eventos.size - 1) {
+                procesarSiguienteEvento()
                 delay(_state.value.velocidadMs)
             }
-            if (_state.value.eventoActual >= (currentData?.eventos?.size ?: 0)) {
-                _state.update { it.copy(isPlaying = false) }
+            _state.update { it.copy(isPlaying = false) }
+        }
+    }
+
+    private fun stopPlayback() {
+        playbackJob?.cancel()
+        _state.update { it.copy(isPlaying = false) }
+    }
+
+    private fun procesarSiguienteEvento() {
+        val nextIndex = _state.value.eventoActualIndex + 1
+        if (nextIndex >= _state.value.eventos.size) return
+        
+        val evento = _state.value.eventos[nextIndex]
+        _state.update { current ->
+            when (evento) {
+                is EventoLaberinto.Iniciado -> {
+                    current.copy(
+                        eventoActualIndex = nextIndex,
+                        animLaberinto = Laberinto.vacio(evento.configuracion)
+                    )
+                }
+                is EventoLaberinto.Cavado -> {
+                    val nuevaGrilla = abrirPared(current.animLaberinto!!.grilla, evento.desde, evento.hacia)
+                    current.copy(
+                        eventoActualIndex = nextIndex,
+                        visitadas = current.visitadas + evento.hacia,
+                        mineroPos = evento.hacia,
+                        animLaberinto = current.animLaberinto?.copy(grilla = nuevaGrilla)
+                    )
+                }
+                is EventoLaberinto.Retroceso -> {
+                    current.copy(eventoActualIndex = nextIndex, mineroPos = evento.hacia)
+                }
+                is EventoLaberinto.CicloCreado -> {
+                    val nuevaGrilla = abrirPared(current.animLaberinto!!.grilla, evento.desde, evento.hacia)
+                    current.copy(
+                        eventoActualIndex = nextIndex,
+                        animLaberinto = current.animLaberinto?.copy(grilla = nuevaGrilla)
+                    )
+                }
+                is EventoLaberinto.CaminoActualizado -> {
+                    current.copy(eventoActualIndex = nextIndex, caminoOptimoVisual = evento.camino)
+                }
+                is EventoLaberinto.Finalizado -> {
+                    current.copy(
+                        eventoActualIndex = nextIndex,
+                        animLaberinto = evento.laberinto,
+                        caminoOptimoVisual = evento.laberinto.caminoOptimo
+                    )
+                }
+                else -> current.copy(eventoActualIndex = nextIndex)
             }
         }
     }
 
-    fun avanzarPaso() {
-        val data = currentData ?: return
-        val idx = _state.value.eventoActual
-        if (idx >= data.eventos.size) {
-            pausar()
-            return
-        }
-
-        val evento = data.eventos[idx]
-        val lab = _state.value.animLaberinto ?: return
-
-        val nuevasVisitadas = _state.value.visitadas.toMutableSet()
-        val nuevasHuellas = _state.value.huellas.toMutableList()
-        var nuevoMinero: Coordenada? = _state.value.mineroPos
-
-        when (evento) {
-            is EventoGeneracion.Iniciado -> {
-                nuevoMinero = evento.posicionInicial
-                nuevasVisitadas.add(evento.posicionInicial)
-                nuevasHuellas.add(evento.posicionInicial)
-            }
-            is EventoGeneracion.Cavado -> {
-                lab.cavarCamino(evento.desde, evento.direccion)
-                nuevasVisitadas.add(evento.hasta)
-                nuevoMinero = evento.hasta
-                nuevasHuellas.add(evento.hasta)
-            }
-            is EventoGeneracion.Retrocedido -> {
-                if (nuevasHuellas.isNotEmpty()) nuevasHuellas.removeLast()
-                nuevoMinero = evento.hasta
-            }
-            is EventoGeneracion.Finalizado -> {
-                nuevoMinero = data.inicio
-                // Al finalizar, forzamos que se use el laberinto completo de 'data' 
-                // para que se vean las puertas del centro abiertas
-                _state.update { it.copy(animLaberinto = data.laberinto) }
+    private fun abrirPared(grilla: List<List<Celda>>, desde: Coordenada, hacia: Coordenada): List<List<Celda>> {
+        val dir = Direccion.entries.find { desde.fila + it.dx == hacia.fila && desde.columna + it.dy == hacia.columna }
+            ?: return grilla
+            
+        return grilla.mapIndexed { r, fila ->
+            fila.mapIndexed { c, celda ->
+                when {
+                    r == desde.fila && c == desde.columna -> celda.copy(paredes = celda.paredes - dir)
+                    r == hacia.fila && c == hacia.columna -> celda.copy(paredes = celda.paredes - dir.opuesta())
+                    else -> celda
+                }
             }
         }
-
-        _state.update { 
-            it.copy(
-                visitadas = nuevasVisitadas,
-                huellas = nuevasHuellas,
-                mineroPos = nuevoMinero,
-                eventoActual = idx + 1
-            )
-        }
-    }
-
-    fun evaluarLaberinto() {
-        val data = currentData ?: return
-        val evaluador = com.uns.backtracker.service.EvaluadorLaberinto()
-        val resultado = evaluador.evaluar(data.laberinto, data.inicio, data.objetivo, _state.value.config)
-        _state.update { it.copy(evaluacion = resultado) }
     }
 }

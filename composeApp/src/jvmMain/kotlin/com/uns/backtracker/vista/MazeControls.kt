@@ -16,7 +16,8 @@ import androidx.compose.foundation.TooltipArea
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight
+import com.uns.backtracker.dominio.model.*
 import com.uns.backtracker.viewmodel.MazeViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -27,175 +28,190 @@ fun MazeControls(viewModel: MazeViewModel, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .background(MaterialTheme.colorScheme.surface)
-            .padding(8.dp)
+            .padding(12.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        // --- SECCIÓN: CONFIGURACIÓN ---
-        SeccionExpandible(
-            titulo = "Configuración",
-            icono = Icons.Default.Settings,
-            inicialmenteExpandido = true
-        ) {
-            var anchoStr by remember { mutableStateOf(estado.config.ancho.toString()) }
-            var altoStr by remember { mutableStateOf(estado.config.alto.toString()) }
-            var semillaStr by remember { mutableStateOf(estado.config.semilla.toString()) }
-            var cuartoStr by remember { mutableStateOf(estado.config.tamanoCuartoCentro.toString()) }
+        SeccionExpandible(titulo = "Configuración", icono = Icons.Default.Settings, inicialmenteExpandido = true) {
+            var anchoStr by remember { mutableStateOf(estado.config.columnas.toString()) }
+            var altoStr by remember { mutableStateOf(estado.config.filas.toString()) }
+            var semillaStr by remember { mutableStateOf(estado.config.semillaValue.toString()) }
+            var sFilaStr by remember { mutableStateOf(estado.config.inicio.fila.toString()) }
+            var sColStr by remember { mutableStateOf(estado.config.inicio.columna.toString()) }
+            var eFilaStr by remember { mutableStateOf(estado.config.fin.fila.toString()) }
+            var eColStr by remember { mutableStateOf(estado.config.fin.columna.toString()) }
+            var dificultad by remember { mutableStateOf(estado.config.dificultad) }
+            var expandedDificultad by remember { mutableStateOf(false) }
             var mensajeError by remember { mutableStateOf<String?>(null) }
 
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        modifier = Modifier.weight(1f),
-                        value = anchoStr, 
-                        onValueChange = { if (it.all { c -> c.isDigit() }) anchoStr = it }, 
-                        label = { Text("Ancho") },
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        modifier = Modifier.weight(1f),
-                        value = altoStr, 
-                        onValueChange = { if (it.all { c -> c.isDigit() }) altoStr = it }, 
-                        label = { Text("Alto") },
-                        singleLine = true
-                    )
-                }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        modifier = Modifier.weight(1f),
-                        value = semillaStr, 
-                        onValueChange = { if (it.all { c -> c.isDigit() }) semillaStr = it }, 
-                        label = { Text("Semilla") },
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        modifier = Modifier.weight(1f),
-                        value = cuartoStr, 
-                        onValueChange = { if (it.all { c -> c.isDigit() }) cuartoStr = it }, 
-                        label = { Text("Centro") },
-                        singleLine = true
-                    )
-                }
-                
-                Button(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = { 
-                        val w = anchoStr.toIntOrNull()
-                        val h = altoStr.toIntOrNull()
-                        val s = semillaStr.toLongOrNull() ?: System.currentTimeMillis()
-                        val c = cuartoStr.toIntOrNull()
+            LaunchedEffect(estado.config) {
+                sFilaStr = estado.config.inicio.fila.toString()
+                sColStr = estado.config.inicio.columna.toString()
+                eFilaStr = estado.config.fin.fila.toString()
+                eColStr = estado.config.fin.columna.toString()
+            }
 
-                        when {
-                            w == null || h == null || c == null -> {
-                                mensajeError = "Ingresa números válidos."
-                            }
-                            w <= 0 || h <= 0 -> {
-                                mensajeError = "Ancho y alto deben ser positivos."
-                            }
-                            w > 100 || h > 100 -> {
-                                mensajeError = "Máximo 100x100 para rendimiento."
-                            }
-                            c < 1 -> {
-                                mensajeError = "Centro mínimo 1."
-                            }
-                            c >= w || c >= h -> {
-                                mensajeError = "Centro muy grande."
-                            }
-                            else -> {
-                                mensajeError = null
-                                viewModel.updateConfig(w, h, s, c)
-                                viewModel.generar()
-                            }
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = anchoStr,
+                        onValueChange = { if (it.all { c -> c.isDigit() }) anchoStr = it },
+                        modifier = Modifier.weight(1f),
+                        label = { Text("Cols") }
+                    )
+                    OutlinedTextField(
+                        value = altoStr,
+                        onValueChange = { if (it.all { c -> c.isDigit() }) altoStr = it },
+                        modifier = Modifier.weight(1f),
+                        label = { Text("Filas") }
+                    )
+                }
+                OutlinedTextField(
+                    value = semillaStr,
+                    onValueChange = { if (it.all { c -> c.isDigit() }) semillaStr = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Semilla") },
+                    trailingIcon = {
+                        IconButton(onClick = { semillaStr = System.currentTimeMillis().toString() }) {
+                            Icon(Icons.Default.Casino, contentDescription = null)
                         }
                     }
+                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.LocationOn, null, tint = MaterialTheme.colorScheme.primary)
+                    Text("Inicio (S)", Modifier.weight(1f))
+                    OutlinedTextField(
+                        value = sFilaStr,
+                        onValueChange = { sFilaStr = it },
+                        modifier = Modifier.width(70.dp),
+                        label = { Text("F") }
+                    )
+                    OutlinedTextField(
+                        value = sColStr,
+                        onValueChange = { sColStr = it },
+                        modifier = Modifier.width(70.dp),
+                        label = { Text("C") }
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.Flag, null, tint = MaterialTheme.colorScheme.secondary)
+                    Text("Fin (E)", Modifier.weight(1f))
+                    OutlinedTextField(
+                        value = eFilaStr,
+                        onValueChange = { eFilaStr = it },
+                        modifier = Modifier.width(70.dp),
+                        label = { Text("F") }
+                    )
+                    OutlinedTextField(
+                        value = eColStr,
+                        onValueChange = { eColStr = it },
+                        modifier = Modifier.width(70.dp),
+                        label = { Text("C") }
+                    )
+                }
+                Box(Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = dificultad.name.lowercase().replaceFirstChar { it.uppercase() },
+                        onValueChange = {},
+                        label = { Text("Dificultad") },
+                        readOnly = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        trailingIcon = {
+                            IconButton(onClick = { expandedDificultad = true }) {
+                                Icon(Icons.Default.ArrowDropDown, null)
+                            }
+                        }
+                    )
+                    DropdownMenu(
+                        expanded = expandedDificultad,
+                        onDismissRequest = { expandedDificultad = false },
+                        modifier = Modifier.width(200.dp)
+                    ) {
+                        Dificultad.entries.forEach { level ->
+                            DropdownMenuItem(
+                                text = { Text(level.name.lowercase().replaceFirstChar { it.uppercase() }) },
+                                onClick = {
+                                    dificultad = level
+                                    expandedDificultad = false
+                                }
+                            )
+                        }
+                    }
+                }
+                Button(
+                    onClick = {
+                        val w = anchoStr.toIntOrNull()
+                        val h = altoStr.toIntOrNull()
+                        val s = semillaStr.toLongOrNull() ?: 0L
+                        val sf = sFilaStr.toIntOrNull()
+                        val sc = sColStr.toIntOrNull()
+                        val ef = eFilaStr.toIntOrNull()
+                        val ec = eColStr.toIntOrNull()
+                        if (w != null && h != null && sf != null && sc != null && ef != null && ec != null) {
+                            if (sf in 0 until h && sc in 0 until w && ef in 0 until h && ec in 0 until w) {
+                                mensajeError = null
+                                viewModel.updateConfigManual(w, h, s, dificultad, Coordenada(sf, sc), Coordenada(ef, ec))
+                                viewModel.generar()
+                            } else mensajeError = "Coordenadas fuera de rango."
+                        } else mensajeError = "Datos inválidos."
+                    },
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(Icons.Default.Refresh, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Icon(Icons.Default.Refresh, null)
+                    Spacer(Modifier.width(8.dp))
                     Text("Generar")
                 }
-
-                mensajeError?.let { error ->
-                    Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
-                }
+                mensajeError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
         }
 
-        // --- SECCIÓN: REPRODUCCIÓN ---
-        SeccionExpandible(
-            titulo = "Reproducción",
-            icono = Icons.Default.PlayArrow,
-            inicialmenteExpandido = true
-        ) {
+        Spacer(Modifier.height(8.dp))
+        SeccionExpandible("Reproducción", Icons.Default.PlayArrow, true) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = "Paso: ${estado.eventoActual} / ${estado.totalEventos}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(modifier = Modifier.weight(1f), onClick = { viewModel.togglePlayPause() }) {
-                        Icon(if (estado.isPlaying) Icons.Default.Close else Icons.Default.PlayArrow, contentDescription = null)
-                        Spacer(modifier = Modifier.width(4.dp))
+                Text("Evento: ${estado.eventoActualIndex + 1} / ${estado.eventos.size}", color = MaterialTheme.colorScheme.primary)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { viewModel.togglePlayPause() },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(if (estado.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, null)
+                        Spacer(Modifier.width(4.dp))
                         Text(if (estado.isPlaying) "Pausar" else "Play")
                     }
-                    Button(modifier = Modifier.weight(1f), onClick = { viewModel.avanzarPaso() }, enabled = !estado.isPlaying) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
-                        Spacer(modifier = Modifier.width(4.dp))
+                    OutlinedButton(
+                        onClick = { viewModel.avanzarPaso() },
+                        modifier = Modifier.weight(1f),
+                        enabled = !estado.isPlaying
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowForward, null)
+                        Spacer(Modifier.width(4.dp))
                         Text("Paso")
                     }
                 }
-                
-                Spacer(modifier = Modifier.height(4.dp))
-                Text("Velocidad: ${estado.velocidadMs}ms", style = MaterialTheme.typography.labelMedium)
                 Slider(
                     value = estado.velocidadMs.toFloat(),
                     onValueChange = { viewModel.updateSpeed(it.toLong()) },
-                    valueRange = 1f..100f
+                    valueRange = 5f..500f
                 )
             }
         }
 
-        // --- SECCIÓN: HISTORIAL DE EVENTOS ---
-        SeccionExpandible(
-            titulo = "Historial de Eventos",
-            icono = Icons.AutoMirrored.Filled.List,
-            inicialmenteExpandido = false
-        ) {
-            MazeEventsTable(estado = estado, modifier = Modifier.fillMaxWidth())
-        }
-
-        // --- SECCIÓN: EVALUACIÓN ---
-        SeccionExpandible(
-            titulo = "Evaluación / Ruta Crítica",
-            icono = Icons.Default.Info,
-            inicialmenteExpandido = false
-        ) {
-            val eval = estado.evaluacion
-            if (eval != null) {
-                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    ListItem(
-                        headlineText = { Text("Dificultad: ${eval.nivelDificultad()}") },
-                        supportingText = { Text("Valor: ${"%.2f".format(eval.dificultad)}") },
-                        leadingContent = { Icon(Icons.Default.Star, contentDescription = null, tint = MaterialTheme.colorScheme.secondary) }
-                    )
-                    MetricaConInfo("Longitud Óptima", "${eval.longitudSolucion}", "Número de movimientos necesarios para resolver el laberinto. A mayor número, más largo es el recorrido hacia el centro.")
-                    MetricaConInfo("Callejones", "${eval.callejones}", "Número de celdas con una sola salida (caminos sin salida). Engañan al usuario haciéndolo retroceder.")
-                    MetricaConInfo("Bifurcaciones", "${eval.bifurcaciones}", "Número de celdas con 3 o más caminos. Representan puntos de decisión en el laberinto.")
-                    MetricaConInfo("Densidad Intersec.", "%.2f".format(eval.densidadIntersecciones), "Proporción de bifurcaciones respecto al total de celdas. Mide qué tan enredado es el laberinto globalmente.")
-                    MetricaConInfo("Pasillo más largo", "${eval.pasilloMasLargo}", "La ruta recta más larga sin opciones de desvío.")
+        Spacer(Modifier.height(8.dp))
+        SeccionExpandible("Métricas", Icons.Default.Analytics, true) {
+            val lab = estado.laberintoFinal
+            if (lab != null) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    MetricaConInfo("Camino Óptimo (L*)", "${lab.metricas.longitudCaminoOptimo}", "Longitud mínima real.")
+                    MetricaConInfo("Optimalidad (ρ)", "%.2f".format(lab.metricas.ratioOptimalidad), "Eficiencia de la ruta.")
+                    MetricaConInfo("Ramificación (b)", "%.2f".format(lab.metricas.factorRamificacion), "Densidad de bifurcaciones.")
                 }
             } else {
-                Button(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = { viewModel.evaluarLaberinto() },
-                    enabled = !estado.isPlaying && estado.eventoActual >= estado.totalEventos && estado.totalEventos > 0
-                ) {
-                    Text("Calcular Ruta Óptima")
-                }
+                Text("Sin datos.", style = MaterialTheme.typography.bodySmall)
             }
+        }
+
+        Spacer(Modifier.height(8.dp))
+        SeccionExpandible("Log de Operaciones", Icons.AutoMirrored.Filled.List, false) {
+            MazeEventsTable(estado = estado, modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp))
         }
     }
 }
@@ -203,43 +219,29 @@ fun MazeControls(viewModel: MazeViewModel, modifier: Modifier = Modifier) {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MetricaConInfo(etiqueta: String, valor: String, explicacion: String) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+    TooltipArea(
+        tooltip = {
+            Surface(
+                modifier = Modifier.shadow(8.dp),
+                color = MaterialTheme.colorScheme.inverseSurface,
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(
+                    text = explicacion,
+                    modifier = Modifier.padding(12.dp).widthIn(max = 280.dp),
+                    style = MaterialTheme.typography.labelMedium
+                )
+            }
+        }
     ) {
-        Text(
-            text = "$etiqueta: $valor", 
-            style = MaterialTheme.typography.bodySmall, 
-            modifier = Modifier.weight(1f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        
-        TooltipArea(
-            tooltip = {
-                Surface(
-                    modifier = Modifier.shadow(8.dp),
-                    color = MaterialTheme.colorScheme.inverseSurface,
-                    contentColor = MaterialTheme.colorScheme.inverseOnSurface,
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(
-                        text = explicacion,
-                        modifier = Modifier.padding(12.dp).widthIn(max = 280.dp),
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                }
-            },
-            delayMillis = 200
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
         ) {
-            Icon(
-                imageVector = Icons.Default.Info,
-                contentDescription = null,
-                modifier = Modifier
-                    .size(22.dp)
-                    .padding(2.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
+            Text(etiqueta, Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
+            Text(valor, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(4.dp))
+            Icon(Icons.Default.HelpOutline, null, Modifier.size(16.dp))
         }
     }
 }

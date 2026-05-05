@@ -21,37 +21,33 @@ fun App() {
             
             if (esEstrecho) {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    // El Canvas ocupa la parte superior
                     Box(modifier = Modifier.weight(1.2f)) {
-                        MazeCanvas(estado = estado, modifier = Modifier.fillMaxSize())
+                        MazeCanvas(
+                            estado = estado, 
+                            onCellTap = { r, c -> modeloVista.onCeldaClickeada(com.uns.backtracker.dominio.model.Coordenada(r, c)) },
+                            modifier = Modifier.fillMaxSize()
+                        )
                     }
                     Divider(color = MaterialTheme.colorScheme.outlineVariant)
-                    
-                    // Panel de herramientas unificado en la parte inferior
-                    Surface(
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                        tonalElevation = 2.dp
-                    ) {
+                    Surface(modifier = Modifier.weight(1f).fillMaxWidth(), tonalElevation = 2.dp) {
                         MazeControls(viewModel = modeloVista, modifier = Modifier.fillMaxSize())
                     }
                 }
             } else {
                 Row(modifier = Modifier.fillMaxSize()) {
-                    // Panel lateral unificado (Inspector) a la izquierda
-                    Surface(
-                        modifier = Modifier.width(360.dp).fillMaxHeight(),
-                        tonalElevation = 2.dp
-                    ) {
+                    Surface(modifier = Modifier.width(420.dp).fillMaxHeight(), tonalElevation = 2.dp) {
                         MazeControls(viewModel = modeloVista, modifier = Modifier.fillMaxSize())
                     }
                     Divider(
-                        color = MaterialTheme.colorScheme.outlineVariant,
-                        modifier = Modifier.fillMaxHeight().width(1.dp)
+                        modifier = Modifier.fillMaxHeight().width(1.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant
                     )
-                    
-                    // Lienzo principal (Canvas) ocupa el resto del espacio
                     Box(modifier = Modifier.weight(1f)) {
-                        MazeCanvas(estado = estado, modifier = Modifier.fillMaxSize())
+                        MazeCanvas(
+                            estado = estado, 
+                            onCellTap = { r, c -> modeloVista.onCeldaClickeada(com.uns.backtracker.dominio.model.Coordenada(r, c)) },
+                            modifier = Modifier.fillMaxSize()
+                        )
                     }
                 }
             }

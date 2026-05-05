@@ -11,13 +11,18 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import com.uns.backtracker.model.Direccion
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.graphics.StrokeCap
+import com.uns.backtracker.dominio.model.*
 import com.uns.backtracker.viewmodel.MazeState
 
 @Composable
-fun MazeCanvas(estado: MazeState, modifier: Modifier = Modifier) {
+fun MazeCanvas(estado: MazeState, onCellTap: (Int, Int) -> Unit = { _, _ -> }, modifier: Modifier = Modifier) {
     var escala by remember { mutableStateOf(1f) }
     var desplazamiento by remember { mutableStateOf(Offset.Zero) }
+    var tamanoCeldaActual by remember { mutableStateOf(0f) }
+    var margenXActual by remember { mutableStateOf(0f) }
+    var margenYActual by remember { mutableStateOf(0f) }
 
     Canvas(
         modifier = modifier
@@ -30,6 +35,22 @@ fun MazeCanvas(estado: MazeState, modifier: Modifier = Modifier) {
                     desplazamiento += pan
                 }
             }
+            .pointerInput(Unit) {
+                detectTapGestures { offset ->
+                    if (tamanoCeldaActual > 0) {
+                        val centerX = size.width / 2f
+                        val centerY = size.height / 2f
+                        val clickRealX = (offset.x - centerX) / escala + centerX - desplazamiento.x / escala
+                        val clickRealY = (offset.y - centerY) / escala + centerY - desplazamiento.y / escala
+                        val col = ((clickRealX - margenXActual) / tamanoCeldaActual).toInt()
+                        val fila = ((clickRealY - margenYActual) / tamanoCeldaActual).toInt()
+                        val laberinto = estado.animLaberinto
+                        if (laberinto != null && fila in 0 until laberinto.configuracion.filas && col in 0 until laberinto.configuracion.columnas) {
+                            onCellTap(fila, col)
+                        }
+                    }
+                }
+            }
             .graphicsLayer(
                 scaleX = escala,
                 scaleY = escala,
@@ -38,118 +59,71 @@ fun MazeCanvas(estado: MazeState, modifier: Modifier = Modifier) {
             )
     ) {
         val laberinto = estado.animLaberinto ?: return@Canvas
+        val filas = laberinto.configuracion.filas
+        val columnas = laberinto.configuracion.columnas
         
-        // Calcular tamaño de celda dinámicamente
-        val anchoDisponible = size.width * 0.9f
-        val altoDisponible = size.height * 0.9f
+        val anchoDisponible = size.width * 0.95f
+        val altoDisponible = size.height * 0.95f
+        val tamanoCelda = minOf(anchoDisponible / columnas, altoDisponible / filas).coerceAtLeast(1f)
+        val margenX = (size.width - (tamanoCelda * columnas)) / 2f
+        val margenY = (size.height - (tamanoCelda * filas)) / 2f
         
-        if (laberinto.ancho == 0 || laberinto.alto == 0) return@Canvas
+        tamanoCeldaActual = tamanoCelda
+        margenXActual = margenX
+        margenYActual = margenY
         
-        val tamanoCelda = minOf(
-            anchoDisponible / laberinto.ancho,
-            altoDisponible / laberinto.alto
-        ).coerceAtLeast(1f)
-        
-        // Centrar el laberinto
-        val margenX = (size.width - (tamanoCelda * laberinto.ancho)) / 2f
-        val margenY = (size.height - (tamanoCelda * laberinto.alto)) / 2f
-        
-        // Dibujar visitadas
+        // 1. Dibujar visitadas
         estado.visitadas.forEach { pos ->
             drawRect(
-                color = VisitadaColor,
-                topLeft = Offset(margenX + pos.x * tamanoCelda, margenY + pos.y * tamanoCelda),
+                color = MineroColor.copy(alpha = 0.15f),
+                topLeft = Offset(margenX + pos.columna * tamanoCelda, margenY + pos.fila * tamanoCelda),
                 size = Size(tamanoCelda, tamanoCelda)
             )
         }
 
-        // Dibujar Cuarto Centro
-        val tamCuarto = estado.config.tamanoCuartoCentro
-        if (tamCuarto > 0) {
-            val centroX = laberinto.ancho / 2
-            val centroY = laberinto.alto / 2
-            val inicioX = centroX - tamCuarto / 2
-            val inicioY = centroY - tamCuarto / 2
-            
-            drawRect(
-                color = CuartoCentroColor.copy(alpha = 0.25f),
-                topLeft = Offset(margenX + inicioX * tamanoCelda, margenY + inicioY * tamanoCelda),
-                size = Size(tamCuarto * tamanoCelda, tamCuarto * tamanoCelda)
-            )
-        }
-        
-        // Dibujar Paredes
-        val grosorPared = (tamanoCelda * 0.15f).coerceIn(1f, 4f)
-        val centroX = laberinto.ancho / 2
-        val centroY = laberinto.alto / 2
-        val inicioX = centroX - tamCuarto / 2
-        val inicioY = centroY - tamCuarto / 2
-        val finX = inicioX + tamCuarto
-        val finY = inicioY + tamCuarto
-
-        val enCentro = { cx: Int, cy: Int -> 
-            tamCuarto > 0 && cx in inicioX until finX && cy in inicioY until finY 
-        }
-
-        for(y in 0 until laberinto.alto) {
-            for(x in 0 until laberinto.ancho) {
-                val celda = laberinto.celdas[y][x]
-                val px = margenX + x * tamanoCelda
-                val py = margenY + y * tamanoCelda
-                
-                if (!celda.estaAbiertaHacia(Direccion.ARRIBA)) {
-                    if (!(enCentro(x, y) && enCentro(x, y - 1))) {
-                        drawLine(ParedColor, Offset(px, py), Offset(px + tamanoCelda, py), grosorPared, cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                    }
-                }
-                if (!celda.estaAbiertaHacia(Direccion.IZQUIERDA)) {
-                    if (!(enCentro(x, y) && enCentro(x - 1, y))) {
-                        drawLine(ParedColor, Offset(px, py), Offset(px, py + tamanoCelda), grosorPared, cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                    }
-                }
-                if (x == laberinto.ancho - 1 && !celda.estaAbiertaHacia(Direccion.DERECHA)) {
-                    drawLine(ParedColor, Offset(px + tamanoCelda, py), Offset(px + tamanoCelda, py + tamanoCelda), grosorPared, cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                }
-                if (y == laberinto.alto - 1 && !celda.estaAbiertaHacia(Direccion.ABAJO)) {
-                    drawLine(ParedColor, Offset(px, py + tamanoCelda), Offset(px + tamanoCelda, py + tamanoCelda), grosorPared, cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                }
+        // 2. Dibujar Paredes
+        val grosorPared = (tamanoCelda * 0.12f).coerceIn(1f, 4f)
+        for (r in 0 until filas) {
+            for (c in 0 until columnas) {
+                val celda = laberinto.grilla[r][c]
+                val px = margenX + c * tamanoCelda
+                val py = margenY + r * tamanoCelda
+                if (celda.tienePared(Direccion.ARRIBA)) drawLine(ParedColor, Offset(px, py), Offset(px + tamanoCelda, py), grosorPared, cap = StrokeCap.Round)
+                if (celda.tienePared(Direccion.IZQUIERDA)) drawLine(ParedColor, Offset(px, py), Offset(px, py + tamanoCelda), grosorPared, cap = StrokeCap.Round)
+                if (c == columnas - 1 && celda.tienePared(Direccion.DERECHA)) drawLine(ParedColor, Offset(px + tamanoCelda, py), Offset(px + tamanoCelda, py + tamanoCelda), grosorPared, cap = StrokeCap.Round)
+                if (r == filas - 1 && celda.tienePared(Direccion.ABAJO)) drawLine(ParedColor, Offset(px, py + tamanoCelda), Offset(px + tamanoCelda, py + tamanoCelda), grosorPared, cap = StrokeCap.Round)
             }
         }
         
-        // Dibujar Ruta Óptima
-        estado.evaluacion?.let { eval ->
+        // 3. Dibujar S y E
+        val inicio = laberinto.configuracion.inicio
+        val fin = laberinto.configuracion.fin
+        drawRect(InicioColor.copy(alpha = 0.4f), Offset(margenX + inicio.columna * tamanoCelda, margenY + inicio.fila * tamanoCelda), Size(tamanoCelda, tamanoCelda))
+        drawRect(CuartoCentroColor.copy(alpha = 0.4f), Offset(margenX + fin.columna * tamanoCelda, margenY + fin.fila * tamanoCelda), Size(tamanoCelda, tamanoCelda))
+
+        // 4. Ruta Óptima
+        if (estado.caminoOptimoVisual.isNotEmpty()) {
             val colorRuta = RutaOptimaColor.copy(alpha = 0.8f)
             val grosorRuta = tamanoCelda * 0.25f
-            for (i in 0 until eval.rutaOptima.size - 1) {
-                val actual = eval.rutaOptima[i]
-                val siguiente = eval.rutaOptima[i + 1]
-                
-                val startX = margenX + actual.x * tamanoCelda + tamanoCelda / 2f
-                val startY = margenY + actual.y * tamanoCelda + tamanoCelda / 2f
-                val endX = margenX + siguiente.x * tamanoCelda + tamanoCelda / 2f
-                val endY = margenY + siguiente.y * tamanoCelda + tamanoCelda / 2f
-                
-                drawLine(colorRuta, Offset(startX, startY), Offset(endX, endY), grosorRuta, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+            for (i in 0 until estado.caminoOptimoVisual.size - 1) {
+                val actual = estado.caminoOptimoVisual[i]
+                val siguiente = estado.caminoOptimoVisual[i + 1]
+                val startX = margenX + actual.columna * tamanoCelda + tamanoCelda / 2f
+                val startY = margenY + actual.fila * tamanoCelda + tamanoCelda / 2f
+                val endX = margenX + siguiente.columna * tamanoCelda + tamanoCelda / 2f
+                val endY = margenY + siguiente.fila * tamanoCelda + tamanoCelda / 2f
+                drawLine(colorRuta, Offset(startX, startY), Offset(endX, endY), grosorRuta, cap = StrokeCap.Round)
             }
         }
 
-        // Dibujar Minero
+        // 5. Minero
         estado.mineroPos?.let { pos ->
-            val px = margenX + pos.x * tamanoCelda
-            val py = margenY + pos.y * tamanoCelda
+            val px = margenX + pos.columna * tamanoCelda
+            val py = margenY + pos.fila * tamanoCelda
             val tamMinero = tamanoCelda * 0.6f
             val margenMinero = (tamanoCelda - tamMinero) / 2f
-            
-            drawOval(
-                color = MineroColor.copy(alpha = 0.3f),
-                topLeft = Offset(px + margenMinero - 2f, py + margenMinero - 2f),
-                size = Size(tamMinero + 4f, tamMinero + 4f)
-            )
-            drawOval(
-                color = MineroColor,
-                topLeft = Offset(px + margenMinero, py + margenMinero),
-                size = Size(tamMinero, tamMinero)
-            )
+            drawOval(MineroColor.copy(alpha = 0.3f), Offset(px + margenMinero - 2f, py + margenMinero - 2f), Size(tamMinero + 4f, tamMinero + 4f))
+            drawOval(MineroColor, Offset(px + margenMinero, py + margenMinero), Size(tamMinero, tamMinero))
         }
     }
 }
