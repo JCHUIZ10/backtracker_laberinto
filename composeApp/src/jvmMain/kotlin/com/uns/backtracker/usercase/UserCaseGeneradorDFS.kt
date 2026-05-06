@@ -5,14 +5,14 @@ import com.uns.backtracker.dominio.model.*
 import com.uns.backtracker.observador.IObservadorLaberinto
 import kotlin.random.Random
 
-class UserCaseGeneradorDFS(private var random: Random) {
+class UserCaseGeneradorDFS {
     private val observadores = mutableListOf<IObservadorLaberinto>()
 
     fun agregarObservador(obs: IObservadorLaberinto) = observadores.add(obs)
     private fun emitir(evento: EventoLaberinto) = observadores.forEach { it.onEvento(evento) }
 
     fun generar(config: ConfiguracionLaberinto): List<List<Celda>> {
-        random = config.semilla
+        val random = Random(config.semillaValue)
         val grilla = Array(config.filas) { r -> Array(config.columnas) { c -> Celda(r, c) } }
         val visitadas = mutableSetOf<Coordenada>()
         val pila = mutableListOf<Coordenada>()

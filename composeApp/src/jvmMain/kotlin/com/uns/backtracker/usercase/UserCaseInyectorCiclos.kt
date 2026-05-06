@@ -12,7 +12,7 @@ class UserCaseInyectorCiclos {
 
     fun inyectar(grilla: List<List<Celda>>, config: ConfiguracionLaberinto): List<List<Celda>> {
         val mutableGrilla = grilla.map { it.toMutableList() }.toMutableList()
-        val random = config.semilla
+        val random = Random(config.semillaValue)
         val filas = config.filas
         val columnas = config.columnas
         

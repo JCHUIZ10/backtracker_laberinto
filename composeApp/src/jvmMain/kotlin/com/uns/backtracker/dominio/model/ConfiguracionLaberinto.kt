@@ -8,8 +8,7 @@ data class ConfiguracionLaberinto(
     val inicio: Coordenada,
     val fin: Coordenada,
     val dificultad: Dificultad,
-    val semillaValue: Long,
-    val semilla: Random = Random(semillaValue)
+    val semillaValue: Long
 ){
     init {
         require(filas > 0) { "Las filas deben ser mayores a 0" }

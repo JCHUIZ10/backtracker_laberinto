@@ -21,7 +21,7 @@ class MazeViewModel : IObservadorLaberinto {
     private var botPlaybackJob: Job? = null
 
     private val facade = GeneradorLaberintoFacade(
-        generadorDFS = UserCaseGeneradorDFS(Random(0)),
+        generadorDFS = UserCaseGeneradorDFS(),
         inyectorCiclos = UserCaseInyectorCiclos(),
         solucionadorBFS = UserCaseSolucionadorBFS(),
         calculadorMetricas = UserCaseCalculadorMetricas()
