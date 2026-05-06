@@ -56,7 +56,7 @@ class UserCaseGeneradorDFS(private var random: Random) {
             }
         }
 
-        emitir(EventoLaberinto.FaseFinalizada("DFS"))
+        emitir(EventoLaberinto.FaseFinalizada("Finalizar Generación Laberinto"))
         return grilla.map { it.toList() }
     }
 

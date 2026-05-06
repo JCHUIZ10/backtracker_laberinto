@@ -6,7 +6,7 @@ import androidx.compose.ui.window.application
 fun main() = application {
     Window(
         onCloseRequest = ::exitApplication,
-        title = "Algoritmo de generación de Laberinto usando Backtracker",
+        title = "Generacion De Laberintos",
     ) {
         App()
     }

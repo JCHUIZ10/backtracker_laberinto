@@ -13,6 +13,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.res.painterResource
+import com.uns.backtracker.dominio.eventos.EventoBot
 import com.uns.backtracker.dominio.model.*
 import com.uns.backtracker.viewmodel.MazeState
 
@@ -23,6 +25,8 @@ fun MazeCanvas(estado: MazeState, onCellTap: (Int, Int) -> Unit = { _, _ -> }, m
     var tamanoCeldaActual by remember { mutableStateOf(0f) }
     var margenXActual by remember { mutableStateOf(0f) }
     var margenYActual by remember { mutableStateOf(0f) }
+
+    val botPainter = painterResource("bot.png")
 
     Canvas(
         modifier = modifier
@@ -102,7 +106,7 @@ fun MazeCanvas(estado: MazeState, onCellTap: (Int, Int) -> Unit = { _, _ -> }, m
         drawRect(CuartoCentroColor.copy(alpha = 0.4f), Offset(margenX + fin.columna * tamanoCelda, margenY + fin.fila * tamanoCelda), Size(tamanoCelda, tamanoCelda))
 
         // 4. Ruta Óptima
-        if (estado.caminoOptimoVisual.isNotEmpty()) {
+        if (estado.mostrarRutaOptima && estado.caminoOptimoVisual.isNotEmpty()) {
             val colorRuta = RutaOptimaColor.copy(alpha = 0.8f)
             val grosorRuta = tamanoCelda * 0.25f
             for (i in 0 until estado.caminoOptimoVisual.size - 1) {
@@ -116,6 +120,24 @@ fun MazeCanvas(estado: MazeState, onCellTap: (Int, Int) -> Unit = { _, _ -> }, m
             }
         }
 
+        // 4.5. Ruta Recorrida del Bot (Camino activo del Bot)
+        if (estado.mostrarRutaBot) {
+            val rutaBot = obtenerRutaActualBot(estado)
+            if (rutaBot.isNotEmpty()) {
+                val colorRutaBot = RutaBotColor.copy(alpha = 0.8f)
+                val grosorRutaBot = tamanoCelda * 0.20f // Un poco más delgada para distinguirla
+                for (i in 0 until rutaBot.size - 1) {
+                    val actual = rutaBot[i]
+                    val siguiente = rutaBot[i + 1]
+                    val startX = margenX + actual.columna * tamanoCelda + tamanoCelda / 2f
+                    val startY = margenY + actual.fila * tamanoCelda + tamanoCelda / 2f
+                    val endX = margenX + siguiente.columna * tamanoCelda + tamanoCelda / 2f
+                    val endY = margenY + siguiente.fila * tamanoCelda + tamanoCelda / 2f
+                    drawLine(colorRutaBot, Offset(startX, startY), Offset(endX, endY), grosorRutaBot, cap = StrokeCap.Round)
+                }
+            }
+        }
+
         // 5. Minero
         estado.mineroPos?.let { pos ->
             val px = margenX + pos.columna * tamanoCelda
@@ -125,5 +147,56 @@ fun MazeCanvas(estado: MazeState, onCellTap: (Int, Int) -> Unit = { _, _ -> }, m
             drawOval(MineroColor.copy(alpha = 0.3f), Offset(px + margenMinero - 2f, py + margenMinero - 2f), Size(tamMinero + 4f, tamMinero + 4f))
             drawOval(MineroColor, Offset(px + margenMinero, py + margenMinero), Size(tamMinero, tamMinero))
         }
+
+        // 6. Bot Explorador
+        estado.botPosActual?.let { pos ->
+            val px = margenX + pos.columna * tamanoCelda
+            val py = margenY + pos.fila * tamanoCelda
+            val tamBot = tamanoCelda * 0.8f
+            val margenBot = (tamanoCelda - tamBot) / 2f
+            
+            // Dibujar aura de color naranja neon
+            drawOval(
+                color = androidx.compose.ui.graphics.Color(0xFFFFA726).copy(alpha = 0.4f),
+                topLeft = Offset(px + margenBot - 2f, py + margenBot - 2f),
+                size = Size(tamBot + 4f, tamBot + 4f)
+            )
+
+            // Dibujar bot.png
+            val startX = px + margenBot
+            val startY = py + margenBot
+            // Usamos drawIntoCanvas para dibujar con el Painter
+            drawContext.canvas.save()
+            drawContext.canvas.translate(startX, startY)
+            with(botPainter) {
+                draw(size = Size(tamBot, tamBot))
+            }
+            drawContext.canvas.restore()
+        }
     }
+}
+
+private fun obtenerRutaActualBot(estado: MazeState): List<Coordenada> {
+    val ruta = mutableListOf<Coordenada>()
+    val eventos = estado.eventosBot.take(estado.eventoBotActualIndex + 1)
+    for (evento in eventos) {
+        when (evento) {
+            is EventoBot.Iniciar -> {
+                ruta.clear()
+                ruta.add(evento.inicio)
+            }
+            is EventoBot.Avanzar -> {
+                ruta.add(evento.hacia)
+            }
+            is EventoBot.Retroceder -> {
+                if (ruta.isNotEmpty()) {
+                    ruta.removeAt(ruta.lastIndex)
+                }
+            }
+            is EventoBot.Finalizar -> {
+                // Mantiene el camino finalizado
+            }
+        }
+    }
+    return ruta
 }

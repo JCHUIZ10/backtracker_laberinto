@@ -42,8 +42,7 @@ class UserCaseSolucionadorBFS {
             temp = predecesores[temp]
         }
 
-        emitir(EventoLaberinto.CaminoActualizado(camino))
-        emitir(EventoLaberinto.FaseFinalizada("Solución BFS"))
+        emitir(EventoLaberinto.FaseFinalizada("Definir Ruta Optima"))
         return camino
     }
 }

@@ -11,35 +11,39 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.uns.backtracker.dominio.eventos.EventoLaberinto
+import com.uns.backtracker.dominio.eventos.EventoBot
 import com.uns.backtracker.viewmodel.MazeState
 
 @Composable
-fun MazeEventsTable(estado: MazeState, modifier: Modifier = Modifier) {
+fun BotEventsTable(estado: MazeState, modifier: Modifier = Modifier) {
     val scrollState = rememberLazyListState()
     
-    LaunchedEffect(estado.eventoActualIndex) {
-        if (estado.eventoActualIndex >= 0) {
-            scrollState.animateScrollToItem(estado.eventoActualIndex)
+    LaunchedEffect(estado.eventoBotActualIndex) {
+        if (estado.eventoBotActualIndex >= 0) {
+            scrollState.animateScrollToItem(estado.eventoBotActualIndex)
         }
     }
 
     Column(modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)).padding(4.dp)) {
-        Row(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.primaryContainer).padding(8.dp)) {
-            Text(text = "Operación", modifier = Modifier.weight(1.5f), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
+        Row(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.secondaryContainer).padding(8.dp)) {
+            Text(text = "Acción Bot", modifier = Modifier.weight(1.5f), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
             Text(text = "Fila", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
             Text(text = "Col", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
         }
 
         LazyColumn(state = scrollState, modifier = Modifier.fillMaxWidth()) {
-            items(estado.eventos.take(estado.eventoActualIndex + 1)) { evento ->
+            items(estado.eventosBot.take(estado.eventoBotActualIndex + 1)) { evento ->
                 val (op, fila, col) = evento.aDatosFila()
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = op, 
                         modifier = Modifier.weight(1.5f), 
                         style = MaterialTheme.typography.bodySmall, 
-                        color = if (op.startsWith("FASE")) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface
+                        color = when {
+                            op == "RETROCEDE" -> MaterialTheme.colorScheme.error
+                            op.startsWith("FINALIZA") || op == "INICIA" -> MaterialTheme.colorScheme.primary
+                            else -> MaterialTheme.colorScheme.onSurface
+                        }
                     )
                     Text(text = fila, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
                     Text(text = col, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
@@ -50,14 +54,11 @@ fun MazeEventsTable(estado: MazeState, modifier: Modifier = Modifier) {
     }
 }
 
-private fun EventoLaberinto.aDatosFila(): Triple<String, String, String> {
+private fun EventoBot.aDatosFila(): Triple<String, String, String> {
     return when (this) {
-        is EventoLaberinto.Iniciado -> Triple("INICIADO", configuracion.inicio.fila.toString(), configuracion.inicio.columna.toString())
-        is EventoLaberinto.Cavado -> Triple("CAVADO", hacia.fila.toString(), hacia.columna.toString())
-        is EventoLaberinto.Retroceso -> Triple("RETROCESO", hacia.fila.toString(), hacia.columna.toString())
-        is EventoLaberinto.CicloCreado -> Triple("CICLO", hacia.fila.toString(), hacia.columna.toString())
-        is EventoLaberinto.FaseFinalizada -> Triple("FINALIZAR: $nombreFase", "-", "-")
-        is EventoLaberinto.CaminoActualizado -> Triple("RUTA", "-", "-")
-        is EventoLaberinto.Finalizado -> Triple("FINALIZADO", "-", "-")
+        is EventoBot.Iniciar -> Triple("INICIA", inicio.fila.toString(), inicio.columna.toString())
+        is EventoBot.Avanzar -> Triple("AVANZA", hacia.fila.toString(), hacia.columna.toString())
+        is EventoBot.Retroceder -> Triple("RETROCEDE", hacia.fila.toString(), hacia.columna.toString())
+        is EventoBot.Finalizar -> Triple(if (exito) "FINALIZA (EXITO)" else "FINALIZA (FALLO)", fin.fila.toString(), fin.columna.toString())
     }
 }

@@ -1,6 +1,7 @@
 package com.uns.backtracker.viewmodel
 
 import com.uns.backtracker.dominio.eventos.EventoLaberinto
+import com.uns.backtracker.dominio.eventos.EventoBot
 import com.uns.backtracker.dominio.model.*
 import com.uns.backtracker.observador.IObservadorLaberinto
 import com.uns.backtracker.usercase.*
@@ -17,6 +18,7 @@ class MazeViewModel : IObservadorLaberinto {
 
     private val viewModelScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var playbackJob: Job? = null
+    private var botPlaybackJob: Job? = null
 
     private val facade = GeneradorLaberintoFacade(
         generadorDFS = UserCaseGeneradorDFS(Random(0)),
@@ -66,6 +68,7 @@ class MazeViewModel : IObservadorLaberinto {
 
     fun generar() {
         stopPlayback()
+        stopBotPlayback()
         _state.update { 
             it.copy(
                 eventos = emptyList(),
@@ -73,13 +76,26 @@ class MazeViewModel : IObservadorLaberinto {
                 visitadas = emptySet(),
                 mineroPos = null,
                 caminoOptimoVisual = emptyList(),
-                laberintoFinal = null
+                laberintoFinal = null,
+                eventosBot = emptyList(),
+                eventoBotActualIndex = -1,
+                isBotPlaying = false,
+                botPosActual = null
             )
         }
 
         viewModelScope.launch(Dispatchers.Default) {
             val laberinto = facade.generar(_state.value.config)
-            _state.update { it.copy(laberintoFinal = laberinto) }
+            
+            val botSimulador = UserCaseSimuladorBot()
+            val botEvents = botSimulador.simular(laberinto)
+            
+            _state.update { 
+                it.copy(
+                    laberintoFinal = laberinto,
+                    eventosBot = botEvents
+                ) 
+            }
             startPlayback()
         }
     }
@@ -176,4 +192,75 @@ class MazeViewModel : IObservadorLaberinto {
             }
         }
     }
+
+    // --- Controladores de reproducción del Bot Explorador ---
+    
+    fun toggleBotPlayPause() {
+        if (_state.value.isBotPlaying) stopBotPlayback() else startBotPlayback()
+    }
+
+    fun avanzarPasoBot() {
+        procesarSiguienteEventoBot()
+    }
+
+    private fun startBotPlayback() {
+        if (botPlaybackJob?.isActive == true) return
+        _state.update { it.copy(isBotPlaying = true) }
+        botPlaybackJob = viewModelScope.launch {
+            while (isActive && _state.value.eventoBotActualIndex < _state.value.eventosBot.size - 1) {
+                procesarSiguienteEventoBot()
+                delay(_state.value.velocidadMs)
+            }
+            _state.update { it.copy(isBotPlaying = false) }
+        }
+    }
+
+    private fun stopBotPlayback() {
+        botPlaybackJob?.cancel()
+        _state.update { it.copy(isBotPlaying = false) }
+    }
+
+    private fun procesarSiguienteEventoBot() {
+        val nextIndex = _state.value.eventoBotActualIndex + 1
+        if (nextIndex >= _state.value.eventosBot.size) return
+        
+        val evento = _state.value.eventosBot[nextIndex]
+        _state.update { current ->
+            when (evento) {
+                is EventoBot.Iniciar -> {
+                    current.copy(
+                        eventoBotActualIndex = nextIndex,
+                        botPosActual = evento.inicio
+                    )
+                }
+                is EventoBot.Avanzar -> {
+                    current.copy(
+                        eventoBotActualIndex = nextIndex,
+                        botPosActual = evento.hacia
+                    )
+                }
+                is EventoBot.Retroceder -> {
+                    current.copy(
+                        eventoBotActualIndex = nextIndex,
+                        botPosActual = evento.hacia
+                    )
+                }
+                is EventoBot.Finalizar -> {
+                    current.copy(
+                        eventoBotActualIndex = nextIndex,
+                        botPosActual = evento.fin
+                    )
+                }
+            }
+        }
+    }
+
+    fun toggleMostrarRutaOptima() {
+        _state.update { it.copy(mostrarRutaOptima = !it.mostrarRutaOptima) }
+    }
+
+    fun toggleMostrarRutaBot() {
+        _state.update { it.copy(mostrarRutaBot = !it.mostrarRutaBot) }
+    }
 }
+

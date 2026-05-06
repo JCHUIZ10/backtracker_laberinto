@@ -14,6 +14,7 @@ val ParedColor = Color(0xFF303030)
 val VisitadaColor = Color(0xFF1A1A1A)
 val MineroColor = Color(0xFF00FFCC)
 val RutaOptimaColor = Color(0xFFCCFF00)
+val RutaBotColor = Color(0xFFFF6600)
 val InicioColor = Color(0xFF9900FF)
 val CuartoCentroColor = Color(0xFFFF0066)
 

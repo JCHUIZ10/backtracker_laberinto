@@ -1,6 +1,7 @@
 package com.uns.backtracker.vista
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -16,6 +17,7 @@ import androidx.compose.foundation.TooltipArea
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import com.uns.backtracker.dominio.model.*
 import com.uns.backtracker.viewmodel.MazeViewModel
@@ -196,7 +198,60 @@ fun MazeControls(viewModel: MazeViewModel, modifier: Modifier = Modifier) {
         }
 
         Spacer(Modifier.height(8.dp))
-        SeccionExpandible("Métricas", Icons.Default.Analytics, true) {
+        SeccionExpandible("Log de Operaciones", Icons.AutoMirrored.Filled.List, false) {
+            MazeEventsTable(estado = estado, modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp))
+        }
+
+        Spacer(Modifier.height(8.dp))
+        SeccionExpandible("Bot Explorador", Icons.Default.Android, false) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                val botImage = painterResource("bot.png")
+                
+                Image(
+                    painter = botImage,
+                    contentDescription = "Bot Logo",
+                    modifier = Modifier
+                        .size(90.dp)
+                        .align(Alignment.CenterHorizontally)
+                        .padding(bottom = 8.dp)
+                )
+                
+                Text(
+                    text = "Evento Bot: ${estado.eventoBotActualIndex + 1} / ${estado.eventosBot.size}", 
+                    color = MaterialTheme.colorScheme.secondary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { viewModel.toggleBotPlayPause() },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                    ) {
+                        Icon(if (estado.isBotPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, null)
+                        Spacer(Modifier.width(4.dp))
+                        Text(if (estado.isBotPlaying) "Pausar" else "Play")
+                    }
+                    OutlinedButton(
+                        onClick = { viewModel.avanzarPasoBot() },
+                        modifier = Modifier.weight(1f),
+                        enabled = !estado.isBotPlaying
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowForward, null)
+                        Spacer(Modifier.width(4.dp))
+                        Text("Paso")
+                    }
+                }
+                
+                Spacer(Modifier.height(4.dp))
+                Text("Historial de Exploración", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                BotEventsTable(estado = estado, modifier = Modifier.fillMaxWidth().heightIn(max = 200.dp))
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+        SeccionExpandible("Métricas", Icons.Default.Analytics, false) {
             val lab = estado.laberintoFinal
             if (lab != null) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -210,8 +265,25 @@ fun MazeControls(viewModel: MazeViewModel, modifier: Modifier = Modifier) {
         }
 
         Spacer(Modifier.height(8.dp))
-        SeccionExpandible("Log de Operaciones", Icons.AutoMirrored.Filled.List, false) {
-            MazeEventsTable(estado = estado, modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp))
+        SeccionExpandible("Mostrar Caminos", Icons.Default.Visibility, false) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(
+                        checked = estado.mostrarRutaOptima,
+                        onCheckedChange = { viewModel.toggleMostrarRutaOptima() }
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Ruta Óptima", style = MaterialTheme.typography.bodyMedium)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(
+                        checked = estado.mostrarRutaBot,
+                        onCheckedChange = { viewModel.toggleMostrarRutaBot() }
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Ruta Recorrida del Bot", style = MaterialTheme.typography.bodyMedium)
+                }
+            }
         }
     }
 }
