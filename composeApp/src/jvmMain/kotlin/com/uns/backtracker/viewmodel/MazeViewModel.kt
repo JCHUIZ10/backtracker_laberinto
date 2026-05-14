@@ -88,7 +88,7 @@ class MazeViewModel : IObservadorLaberinto {
             val laberinto = facade.generar(_state.value.config)
             
             val botSimulador = UserCaseSimuladorBot()
-            val botEvents = botSimulador.simular(laberinto)
+            val botEvents = botSimulador.simular(laberinto, _state.value.algoritmoBot)
             
             _state.update { 
                 it.copy(
@@ -97,6 +97,24 @@ class MazeViewModel : IObservadorLaberinto {
                 ) 
             }
             startPlayback()
+        }
+    }
+
+    fun cambiarAlgoritmoBot(algoritmo: AlgoritmoBot) {
+        stopBotPlayback()
+        _state.update { current ->
+            val laberinto = current.laberintoFinal
+            val botEvents = if (laberinto != null) {
+                UserCaseSimuladorBot().simular(laberinto, algoritmo)
+            } else {
+                emptyList()
+            }
+            current.copy(
+                algoritmoBot = algoritmo,
+                eventosBot = botEvents,
+                eventoBotActualIndex = -1,
+                botPosActual = null
+            )
         }
     }
 

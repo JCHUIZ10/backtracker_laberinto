@@ -32,6 +32,7 @@ data class MazeState(
     val velocidadMs: Long = 30L,
 
     // Bot Explorador
+    val algoritmoBot: AlgoritmoBot = AlgoritmoBot.DFS_ALEATORIO,
     val eventosBot: List<EventoBot> = emptyList(),
     val eventoBotActualIndex: Int = -1,
     val isBotPlaying: Boolean = false,

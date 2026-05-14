@@ -3,6 +3,7 @@ package com.uns.backtracker.vista
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -21,6 +22,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import com.uns.backtracker.dominio.model.*
 import com.uns.backtracker.viewmodel.MazeViewModel
+import androidx.compose.foundation.interaction.MutableInteractionSource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,9 +75,11 @@ fun MazeControls(viewModel: MazeViewModel, modifier: Modifier = Modifier) {
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("Semilla") },
                     trailingIcon = {
-                        IconButton(onClick = { semillaStr = System.currentTimeMillis().toString() }) {
-                            Icon(Icons.Default.Casino, contentDescription = null)
-                        }
+                        Icon(
+                            imageVector = Icons.Default.Casino,
+                            contentDescription = "Generar semilla",
+                            modifier = Modifier.clickable { semillaStr = System.currentTimeMillis().toString() }
+                        )
                     }
                 )
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -118,9 +122,11 @@ fun MazeControls(viewModel: MazeViewModel, modifier: Modifier = Modifier) {
                         readOnly = true,
                         modifier = Modifier.fillMaxWidth(),
                         trailingIcon = {
-                            IconButton(onClick = { expandedDificultad = true }) {
-                                Icon(Icons.Default.ArrowDropDown, null)
-                            }
+                            Icon(
+                                imageVector = Icons.Default.ArrowDropDown,
+                                contentDescription = "Mostrar dificultades",
+                                modifier = Modifier.clickable { expandedDificultad = true }
+                            )
                         }
                     )
                     DropdownMenu(
@@ -134,7 +140,8 @@ fun MazeControls(viewModel: MazeViewModel, modifier: Modifier = Modifier) {
                                 onClick = {
                                     dificultad = level
                                     expandedDificultad = false
-                                }
+                                },
+                                interactionSource = remember { MutableInteractionSource() }
                             )
                         }
                     }
@@ -156,7 +163,8 @@ fun MazeControls(viewModel: MazeViewModel, modifier: Modifier = Modifier) {
                             } else mensajeError = "Coordenadas fuera de rango."
                         } else mensajeError = "Datos inválidos."
                     },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    interactionSource = remember { MutableInteractionSource() }
                 ) {
                     Icon(Icons.Default.Refresh, null)
                     Spacer(Modifier.width(8.dp))
@@ -173,7 +181,8 @@ fun MazeControls(viewModel: MazeViewModel, modifier: Modifier = Modifier) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
                         onClick = { viewModel.togglePlayPause() },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        interactionSource = remember { MutableInteractionSource() }
                     ) {
                         Icon(if (estado.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, null)
                         Spacer(Modifier.width(4.dp))
@@ -182,7 +191,8 @@ fun MazeControls(viewModel: MazeViewModel, modifier: Modifier = Modifier) {
                     OutlinedButton(
                         onClick = { viewModel.avanzarPaso() },
                         modifier = Modifier.weight(1f),
-                        enabled = !estado.isPlaying
+                        enabled = !estado.isPlaying,
+                        interactionSource = remember { MutableInteractionSource() }
                     ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowForward, null)
                         Spacer(Modifier.width(4.dp))
@@ -205,6 +215,7 @@ fun MazeControls(viewModel: MazeViewModel, modifier: Modifier = Modifier) {
         Spacer(Modifier.height(8.dp))
         SeccionExpandible("Bot Explorador", Icons.Default.Android, false) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                @Suppress("DEPRECATION")
                 val botImage = painterResource("bot.png")
                 
                 Image(
@@ -215,6 +226,43 @@ fun MazeControls(viewModel: MazeViewModel, modifier: Modifier = Modifier) {
                         .align(Alignment.CenterHorizontally)
                         .padding(bottom = 8.dp)
                 )
+
+                var expandedAlgo by remember { mutableStateOf(false) }
+                
+                Box(Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = estado.algoritmoBot.nombre,
+                        onValueChange = {},
+                        label = { Text("Método de Exploración") },
+                        readOnly = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        trailingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.ArrowDropDown,
+                                contentDescription = "Mostrar métodos de exploración",
+                                modifier = Modifier.clickable { expandedAlgo = true }
+                            )
+                        }
+                    )
+                    DropdownMenu(
+                        expanded = expandedAlgo,
+                        onDismissRequest = { expandedAlgo = false },
+                        modifier = Modifier.width(200.dp)
+                    ) {
+                        AlgoritmoBot.entries.forEach { algo ->
+                            DropdownMenuItem(
+                                text = { Text(algo.nombre) },
+                                onClick = {
+                                    viewModel.cambiarAlgoritmoBot(algo)
+                                    expandedAlgo = false
+                                },
+                                interactionSource = remember { MutableInteractionSource() }
+                            )
+                        }
+                    }
+                }
+                
+                Spacer(Modifier.height(4.dp))
                 
                 Text(
                     text = "Evento Bot: ${estado.eventoBotActualIndex + 1} / ${estado.eventosBot.size}", 
@@ -227,7 +275,8 @@ fun MazeControls(viewModel: MazeViewModel, modifier: Modifier = Modifier) {
                     Button(
                         onClick = { viewModel.toggleBotPlayPause() },
                         modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                        interactionSource = remember { MutableInteractionSource() }
                     ) {
                         Icon(if (estado.isBotPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, null)
                         Spacer(Modifier.width(4.dp))
@@ -236,7 +285,8 @@ fun MazeControls(viewModel: MazeViewModel, modifier: Modifier = Modifier) {
                     OutlinedButton(
                         onClick = { viewModel.avanzarPasoBot() },
                         modifier = Modifier.weight(1f),
-                        enabled = !estado.isBotPlaying
+                        enabled = !estado.isBotPlaying,
+                        interactionSource = remember { MutableInteractionSource() }
                     ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowForward, null)
                         Spacer(Modifier.width(4.dp))
@@ -270,7 +320,8 @@ fun MazeControls(viewModel: MazeViewModel, modifier: Modifier = Modifier) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(
                         checked = estado.mostrarRutaOptima,
-                        onCheckedChange = { viewModel.toggleMostrarRutaOptima() }
+                        onCheckedChange = { viewModel.toggleMostrarRutaOptima() },
+                        interactionSource = remember { MutableInteractionSource() }
                     )
                     Spacer(Modifier.width(8.dp))
                     Text("Ruta Óptima", style = MaterialTheme.typography.bodyMedium)
@@ -278,7 +329,8 @@ fun MazeControls(viewModel: MazeViewModel, modifier: Modifier = Modifier) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(
                         checked = estado.mostrarRutaBot,
-                        onCheckedChange = { viewModel.toggleMostrarRutaBot() }
+                        onCheckedChange = { viewModel.toggleMostrarRutaBot() },
+                        interactionSource = remember { MutableInteractionSource() }
                     )
                     Spacer(Modifier.width(8.dp))
                     Text("Ruta Recorrida del Bot", style = MaterialTheme.typography.bodyMedium)
@@ -313,7 +365,7 @@ fun MetricaConInfo(etiqueta: String, valor: String, explicacion: String) {
             Text(etiqueta, Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
             Text(valor, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(4.dp))
-            Icon(Icons.Default.HelpOutline, null, Modifier.size(16.dp))
+            Icon(Icons.AutoMirrored.Filled.HelpOutline, null, Modifier.size(16.dp))
         }
     }
 }
